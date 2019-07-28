@@ -7,7 +7,6 @@ import system
 import uinterface
 import urequests
 import wifi
-from default_icons import icon_no_wifi
 
 # globals
 stat = 0
@@ -119,8 +118,6 @@ while True:
         continue
     else:
         count = 0
-    # rgb.clear()
-    # draw_text()  # draw after last refresh, so slower but kinda async.
     old_stat = stat
     if stat == 0:  # generator
         r = urequests.post("https://dashboard.eventinfra.org/api/datasources/proxy/1/render",
