@@ -7,6 +7,7 @@ import system
 import uinterface
 import urequests
 import wifi
+import gc
 
 # globals
 stat = 0
@@ -112,39 +113,49 @@ while True:
             system.reboot()
 
     if count < REFRESH_RATE and stat == old_stat:
+        gc.collect()
         sleep(0.1)
-        rgb.pixel((255, 255, 0), (count, 7))  # refresh counter
+        rgb.pixel((150, 150, 0), (count, 7))  # refresh counter
         count += 1
         continue
     else:
         count = 0
     old_stat = stat
     if stat == 0:  # generator
-        r = urequests.post("https://dashboard.eventinfra.org/api/datasources/proxy/1/render",
-                           data='target=infra.ACT_PWR_1_generator_tot_kva&target=infra.ACT_PWR_2_generator_tot_kva&target=infra.ACT_PWR_3_generator_tot_kva&from=-3min&until=now&format=json&maxDataPoints=768')
+        try:
+            r = urequests.post("https://dashboard.eventinfra.org/api/datasources/proxy/1/render",
+                               data='target=infra.ACT_PWR_1_generator_tot_kva&target=infra.ACT_PWR_2_generator_tot_kva&target=infra.ACT_PWR_3_generator_tot_kva&from=-3min&until=now&format=json&maxDataPoints=768')
+        except:
+            rgb.text("E req")
+            continue
         if r.status_code == 200:
             # rgb.clear()
-            rgb.pixel((0, 255, 0), (REFRESH_RATE, 7))  # green for new data
             try:
                 l = [str(int(i['datapoints'][-1][0])) for i in r.json()]
             except:
                 rgb.pixel((255, 0, 0), (REFRESH_RATE, 7))  # red for error
                 continue
             draw_text()
+            rgb.pixel((0, 150, 0), (REFRESH_RATE, 7))  # green for new data
         else:
             rgb.pixel((255, 0, 0), (REFRESH_RATE, 7))  # red for error
             rgb.text('E {}'.format(r.status_code))
     elif stat == 1:  # up/down link
-        r = urequests.post("https://dashboard.eventinfra.org/api/datasources/proxy/1/render",
-                           data='target=scale(scaleToSeconds(nonNegativeDerivative(net.kvm2.snmp.if_octets-eth3_300.tx),1),8)&target=scale(scaleToSeconds(nonNegativeDerivative(net.kvm2.snmp.if_octets-eth3_300.rx),1),8)&from=-5min&until=now&format=json&maxDataPoints=768')
+        try:
+            r = urequests.post("https://dashboard.eventinfra.org/api/datasources/proxy/1/render",
+                               data='target=scale(scaleToSeconds(nonNegativeDerivative(net.kvm2.snmp.if_octets-eth3_300.tx),1),8)&target=scale(scaleToSeconds(nonNegativeDerivative(net.kvm2.snmp.if_octets-eth3_300.rx),1),8)&from=-5min&until=now&format=json&maxDataPoints=768')
+        except:
+            rgb.text("E req")
+            continue
         if r.status_code == 200:
-            rgb.pixel((0, 255, 0), (REFRESH_RATE, 7))  # green for new data
             try:
                 l = [str(int(i['datapoints'][-1][0] / 1e6)) for i in r.json()]
             except:
                 rgb.pixel((255, 0, 0), (REFRESH_RATE, 7))  # red for error
                 continue
             draw_text()
+            rgb.pixel((0, 150, 0), (REFRESH_RATE, 7))  # green for new data
+
         else:
             rgb.pixel((255, 0, 0), (REFRESH_RATE, 7))  # red for error
             rgb.text('E {}'.format(r.status_code))
