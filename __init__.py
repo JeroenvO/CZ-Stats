@@ -1,5 +1,6 @@
+import gc
 from time import sleep
-
+from math import ceil
 import buttons
 import defines
 import rgb
@@ -7,7 +8,6 @@ import system
 import uinterface
 import urequests
 import wifi
-import gc
 
 # globals
 stat = 0
@@ -69,20 +69,25 @@ def input_B(pressed):
 def input_A(pressed):
     if pressed:
         rgb.background((255, 100, 100))
+    else:
+        rgb.background((0, 0, 0))
+
+
+def draw_error(e):
+    rgb.clear()
+    rgb.pixel((255, 0, 0), (REFRESH_RATE, 7))  # red for error
+    rgb.text('E {}'.format(e))
 
 
 def draw_text():
     global l, color
     rgb.clear()
-    if len(l) == 3:
-        rgb.text(l[0], colors[color][0], (0, 0))
-        rgb.text(l[1], colors[color][1], (11, 0))
-        rgb.text(l[2], colors[color][2], (22, 0))
-    elif len(l) == 2:
-        rgb.text(l[0], colors[color][0], (0, 0))
-        rgb.text(l[1], colors[color][1], (16, 0))
+    if l:
+        rgb.pixel((0, 150, 0), (REFRESH_RATE, 7))  # green for new data
+        for i, d in enumerate(l):
+            rgb.text(d, colors[color][i], (ceil(31/len(l))*i, 0))
     else:
-        rgb.text('error')
+        rgb.text('E Data')
 
 
 # init
@@ -96,17 +101,15 @@ buttons.register(A, input_A)
 rgb.setfont(rgb.FONT_6x3)
 rgb.framerate(10)  # second updates
 REFRESH_RATE = 31  # times framerate updates.
-rgb.pixel((0, 255, 0), (REFRESH_RATE, 7))  # final refresh pixel
 
 # wifi connect
 if not wifi.status():
     if not uinterface.connect_wifi():
         system.reboot()
 rgb.text('Hi!')
-rgb.pixel((255, 255, 0), (0, 7))
 
 # main loop
-count = 0
+count = REFRESH_RATE - 1  # start fast
 while True:
     if not wifi.status():
         if not uinterface.connect_wifi():
@@ -126,20 +129,18 @@ while True:
             r = urequests.post("https://dashboard.eventinfra.org/api/datasources/proxy/1/render",
                                data='target=infra.ACT_PWR_1_generator_tot_kva&target=infra.ACT_PWR_2_generator_tot_kva&target=infra.ACT_PWR_3_generator_tot_kva&from=-3min&until=now&format=json&maxDataPoints=768')
         except:
-            rgb.text("E req")
+            draw_error('req')
             continue
         if r.status_code == 200:
             # rgb.clear()
             try:
                 l = [str(int(i['datapoints'][-1][0])) for i in r.json()]
             except:
-                rgb.pixel((255, 0, 0), (REFRESH_RATE, 7))  # red for error
+                draw_error('json')
                 continue
             draw_text()
-            rgb.pixel((0, 150, 0), (REFRESH_RATE, 7))  # green for new data
         else:
-            rgb.pixel((255, 0, 0), (REFRESH_RATE, 7))  # red for error
-            rgb.text('E {}'.format(r.status_code))
+            draw_error(r.status_code)
     elif stat == 1:  # up/down link
         try:
             r = urequests.post("https://dashboard.eventinfra.org/api/datasources/proxy/1/render",
@@ -151,11 +152,9 @@ while True:
             try:
                 l = [str(int(i['datapoints'][-1][0] / 1e6)) for i in r.json()]
             except:
-                rgb.pixel((255, 0, 0), (REFRESH_RATE, 7))  # red for error
+                draw_error('json')
                 continue
             draw_text()
-            rgb.pixel((0, 150, 0), (REFRESH_RATE, 7))  # green for new data
 
-        else:
-            rgb.pixel((255, 0, 0), (REFRESH_RATE, 7))  # red for error
-            rgb.text('E {}'.format(r.status_code))
+        else:  # non 200 status code
+            draw_error(str(r.status_code))
